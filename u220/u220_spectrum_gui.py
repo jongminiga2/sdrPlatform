@@ -7,10 +7,18 @@ U220 은 libiio 가 아니라 UHD(USRP B210 호환) 로 동작하므로 `bladerf
 로 설치 및 확인한다 (uhd-host, libuhd-dev, python3-uhd, U220 전용 FPGA 이미지).
 """
 
+import os
+import sys
 import threading
 import queue
 import tkinter as tk
 from tkinter import ttk, messagebox
+
+# Windows + MSYS2 MinGW 환경: UHD DLL 경로 등록
+if os.name == "nt" and hasattr(os, "add_dll_directory"):
+    _uhd_dll_dir = os.environ.get("UHD_DLL_DIR", r"C:\msys64\mingw64\bin")
+    if os.path.isdir(_uhd_dll_dir):
+        os.add_dll_directory(_uhd_dll_dir)
 
 import numpy as np
 import matplotlib
@@ -19,6 +27,12 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 import uhd
+
+# U220 전용 FPGA 이미지 경로 (표준 B210 이미지 사용 시 "fx3 is in state 5" 오류 발생)
+_U220_FPGA = os.environ.get(
+    "U220_FPGA_IMAGE",
+    r"C:\Temp\antsdr_u220_ad9361.bin",
+)
 
 FFT_SIZE = 4096
 WATERFALL_ROWS = 120
@@ -43,7 +57,12 @@ class U220Worker(threading.Thread):
         usrp = None
         streamer = None
         try:
-            usrp = uhd.usrp.MultiUSRP(self.params["device_args"])
+            # U220 전용 FPGA 이미지가 있으면 device_args에 추가
+            dev_args = self.params["device_args"].strip()
+            if os.path.isfile(_U220_FPGA):
+                fpga_arg = f"fpga={_U220_FPGA}"
+                dev_args = f"{dev_args},{fpga_arg}" if dev_args else fpga_arg
+            usrp = uhd.usrp.MultiUSRP(dev_args)
 
             usrp.set_rx_rate(self.params["samplerate"], RX_CHANNEL)
             usrp.set_rx_freq(uhd.types.TuneRequest(self.params["freq"]), RX_CHANNEL)
@@ -76,6 +95,9 @@ class U220Worker(threading.Thread):
                 nsamps = streamer.recv(recv_buffer, metadata, RECV_TIMEOUT_S)
 
                 if metadata.error_code == uhd.types.RXMetadataErrorCode.timeout:
+                    continue
+                if metadata.error_code == uhd.types.RXMetadataErrorCode.overflow:
+                    acc = np.empty(0, dtype=np.complex64)  # 오버플로 시 버퍼 리셋
                     continue
                 if metadata.error_code != uhd.types.RXMetadataErrorCode.none:
                     raise RuntimeError(f"UHD RX error: {metadata.strerror()}")
@@ -227,36 +249,42 @@ class SpectrumApp:
                 return
             if self.worker.is_alive():
                 self.root.after(500, self._check_worker_error)
+            else:
+                # 워커가 에러 없이 종료된 경우 (예외적 상황)
+                self.stop()
 
     def _poll_queue(self):
         if self.worker is None:
             return
-        drained = False
         try:
-            while True:
-                freqs, psd_db = self.frame_queue.get_nowait()
-                drained = True
-        except queue.Empty:
-            pass
+            drained = False
+            try:
+                while True:
+                    freqs, psd_db = self.frame_queue.get_nowait()
+                    drained = True
+            except queue.Empty:
+                pass
 
-        if drained:
-            vmin = np.percentile(psd_db, 2) - 5
-            vmax = psd_db.max() + 5
+            if drained:
+                vmin = np.percentile(psd_db, 2) - 5
+                vmax = psd_db.max() + 5
 
-            self.line.set_data(freqs / 1e6, psd_db)
-            self.ax_spec.set_xlim(freqs[0] / 1e6, freqs[-1] / 1e6)
-            self.ax_spec.set_ylim(vmin, vmax)
-            self.ax_spec.set_title(f"Peak: {psd_db.max():.1f} dB @ {freqs[np.argmax(psd_db)]/1e6:.3f} MHz")
+                self.line.set_data(freqs / 1e6, psd_db)
+                self.ax_spec.set_xlim(freqs[0] / 1e6, freqs[-1] / 1e6)
+                self.ax_spec.set_ylim(vmin, vmax)
+                self.ax_spec.set_title(f"Peak: {psd_db.max():.1f} dB @ {freqs[np.argmax(psd_db)]/1e6:.3f} MHz")
 
-            self.waterfall = np.roll(self.waterfall, -1, axis=0)
-            self.waterfall[-1, :] = psd_db
-            self.wf_img.set_data(self.waterfall)
-            self.wf_img.set_extent([freqs[0] / 1e6, freqs[-1] / 1e6, WATERFALL_ROWS, 0])
-            self.wf_img.set_clim(vmin, vmax)
-            self.canvas.draw_idle()
-
-        if self.worker is not None:
-            self.root.after(100, self._poll_queue)
+                self.waterfall = np.roll(self.waterfall, -1, axis=0)
+                self.waterfall[-1, :] = psd_db
+                self.wf_img.set_data(self.waterfall)
+                self.wf_img.set_extent([freqs[0] / 1e6, freqs[-1] / 1e6, WATERFALL_ROWS, 0])
+                self.wf_img.set_clim(vmin, vmax)
+                self.canvas.draw_idle()
+        except Exception as exc:
+            print(f"[poll] {exc}", flush=True)
+        finally:
+            if self.worker is not None:
+                self.root.after(100, self._poll_queue)
 
     def on_close(self):
         self.stop()
