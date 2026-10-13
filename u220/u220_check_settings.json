@@ -1,0 +1,7 @@
+{
+  "device_args": "type=b200,name=u220v2",
+  "freq": "200000000",
+  "agc": false,
+  "gain": "40",
+  "sample_rate_label": "30.72 MHz"
+}

@@ -1,15 +1,50 @@
 @echo off
-REM ANTSDR U220 Spectrum GUI 런처
-REM MSYS2 MinGW Python 환경 + UHD Python 바인딩 사용
+setlocal
+REM ============================================================
+REM  ANTSDR U220 Spectrum GUI launcher
+REM  Runs u220_spectrum_gui.py with MSYS2 MinGW Python + UHD
+REM ============================================================
 
+REM -- Path configuration --
 set MSYS2_PYTHON=C:\msys64\mingw64\bin\python3.exe
 set UHD_DLL_DIR=C:\msys64\mingw64\bin
-set U220_FPGA=C:\Temp\antsdr_u220_ad9361.bin
+set U220_FPGA_IMAGE=C:\Temp\antsdr_u220_ad9361.bin
+set UHD_LOG_LEVEL=warning
 
-"%MSYS2_PYTHON%" -c "import os; os.add_dll_directory('%UHD_DLL_DIR%')" 2>nul
+REM -- Check MSYS2 Python exists --
+if not exist "%MSYS2_PYTHON%" (
+    echo [ERROR] Python not found: %MSYS2_PYTHON%
+    echo.
+    echo  Edit MSYS2_PYTHON in this script to point to python3.exe
+    echo.
+    pause
+    exit /b 1
+)
 
-REM U220 FPGA 이미지 경로를 환경 변수로 전달
-set U220_FPGA_IMAGE=%U220_FPGA%
+REM -- Add UHD DLL directory to PATH --
+set PATH=%UHD_DLL_DIR%;%PATH%
 
+REM -- Pre-check UHD module --
+"%MSYS2_PYTHON%" -c "import uhd" 2>nul
+if errorlevel 1 (
+    echo [WARN] Failed to import python uhd module.
+    echo        UHD_DLL_DIR=%UHD_DLL_DIR%
+    echo        Make sure python-uhd is installed in MSYS2:
+    echo          pacman -S mingw-w64-x86_64-python-uhd
+    echo.
+    echo  Press any key to continue anyway. (Ctrl+C to cancel)
+    pause
+)
+
+REM -- Launch GUI --
+echo [INFO] Running: %MSYS2_PYTHON% "%~dp0u220_spectrum_gui.py"
+echo.
 "%MSYS2_PYTHON%" "%~dp0u220_spectrum_gui.py"
-pause
+
+REM -- Show error code on abnormal exit --
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Program exited with code %errorlevel%.
+    pause
+)
+endlocal
