@@ -68,11 +68,10 @@ def _set_korean_font():
             return
 _set_korean_font()
 
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _U220_FPGA = os.environ.get(
-    'U220_FPGA_IMAGE',
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'usrp_b210_fpga.bin'))
-_SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               'u220_check_settings.json')
+    'U220_FPGA_IMAGE', os.path.join(_SCRIPT_DIR, 'usrp_b210_fpga.bin'))
+_SETTINGS_FILE = os.path.join(_SCRIPT_DIR, 'u220_check_settings.json')
 
 NUM_SAMPLES = 8192
 SAMPLE_RATES  = [61_440_000, 30_720_000, 15_360_000]
@@ -88,11 +87,26 @@ _FIX_QUALITY = {
 # ─── common helpers ───────────────────────────────────────────────────────────
 
 def _build_dev_args(base: str) -> str:
-    args = base.strip()
-    if os.path.isfile(_U220_FPGA):
-        fpga = f'fpga={_U220_FPGA}'
-        return f'{args},{fpga}' if args else fpga
-    return args
+    """device_args 에 U220 전용 FPGA 이미지(fpga=)를 지정한다.
+
+    fpga= 가 이미 있으면 상대경로를 이 스크립트 폴더 기준 절대경로로 바꾼다(UHD 는
+    상대경로를 실행 위치(CWD) 기준으로 찾고, 없으면 이미지 폴더의 같은 이름 파일을
+    경고 없이 대신 로드한다). 없으면 _U220_FPGA 를 붙인다. Linux/Windows 공통.
+    """
+    parts = []
+    has_fpga = False
+    for part in base.strip().split(','):
+        key, sep, val = part.partition('=')
+        if sep and key.strip() == 'fpga':
+            has_fpga = True
+            val = val.strip()
+            if val and not os.path.isabs(val):
+                part = 'fpga=' + os.path.join(_SCRIPT_DIR, val)
+        if part.strip():
+            parts.append(part)
+    if not has_fpga and os.path.isfile(_U220_FPGA):
+        parts.append(f'fpga={_U220_FPGA}')
+    return ','.join(parts)
 
 
 def _dm_to_deg(val: str, hemi: str):
