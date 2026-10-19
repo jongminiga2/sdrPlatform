@@ -53,6 +53,10 @@ from tkinter import messagebox, ttk
 
 os.environ.setdefault('UHD_LOG_LEVEL', 'warning')
 
+_U220_FPGA = os.environ.get(
+    'U220_FPGA_IMAGE',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'usrp_b210_fpga.bin'))
+
 try:
     import uhd  # type: ignore
     _UHD_AVAILABLE = True
@@ -135,7 +139,11 @@ class GnssWorker(threading.Thread):
     def run(self):
         usrp = None
         try:
-            usrp = uhd.usrp.MultiUSRP(self.device_args)
+            dev_args = self.device_args.strip()
+            if os.path.isfile(_U220_FPGA):
+                fpga_arg = f'fpga={_U220_FPGA}'
+                dev_args = f'{dev_args},{fpga_arg}' if dev_args else fpga_arg
+            usrp = uhd.usrp.MultiUSRP(dev_args)
             if self.use_gpsdo:
                 for setter in (usrp.set_clock_source, usrp.set_time_source):
                     try:

@@ -68,7 +68,9 @@ def _set_korean_font():
             return
 _set_korean_font()
 
-_U220_FPGA = os.environ.get('U220_FPGA_IMAGE', r'C:\Temp\antsdr_u220_ad9361.bin')
+_U220_FPGA = os.environ.get(
+    'U220_FPGA_IMAGE',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'usrp_b210_fpga.bin'))
 _SETTINGS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                'u220_check_settings.json')
 

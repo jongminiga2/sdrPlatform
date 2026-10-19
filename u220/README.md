@@ -44,6 +44,7 @@
 - UHD (USRP Hardware Driver)
 - GNU Radio (선택)
 - libad9361 (선택)
+- `usrp_b210_fpga.bin` — U220 전용 FPGA 이미지 (이 디렉토리에 배치 필요, 아래 참고)
 
 ## 설치
 

@@ -8,7 +8,7 @@ REM ============================================================
 REM -- Path settings -------------------------------------------
 set MSYS2_PYTHON=C:\msys64\mingw64\bin\python3.exe
 set UHD_DLL_DIR=C:\msys64\mingw64\bin
-set U220_FPGA_IMAGE=C:\Temp\antsdr_u220_ad9361.bin
+set U220_FPGA_IMAGE=C:\Work\proSDR\usrp_b210_fpga.bin
 set UHD_LOG_LEVEL=warning
 
 REM -- Check MSYS2 Python exists --------------------------------

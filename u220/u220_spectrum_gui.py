@@ -31,7 +31,7 @@ import uhd
 # U220 전용 FPGA 이미지 경로 (표준 B210 이미지 사용 시 "fx3 is in state 5" 오류 발생)
 _U220_FPGA = os.environ.get(
     "U220_FPGA_IMAGE",
-    r"C:\Temp\antsdr_u220_ad9361.bin",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "usrp_b210_fpga.bin"),
 )
 
 FFT_SIZE = 4096
